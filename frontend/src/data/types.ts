@@ -30,6 +30,10 @@ export type PageResult = {
 export type ActionResult = {
   ok: boolean
   message: string
+  /** 生命周期动作的结果码，通用模块不返回。 */
+  code?: string
+  conflictId?: string
+  detectorId?: number
 }
 
 export type OverviewResult = {

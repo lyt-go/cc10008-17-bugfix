@@ -1,8 +1,11 @@
 import { SEED_ROWS } from './seed'
+import type { AnomalyLifecycleState } from './anomaly-types'
+import { emptyLifecycle } from './anomaly-lifecycle'
 import type { EntryRow } from './types'
 
 // 本地持久化：数据放在 localStorage 里，刷新、关掉再打开都还在。
 const STORAGE_KEY = 'behavior-event-trace-hub:entries'
+const LIFECYCLE_KEY = 'behavior-event-trace-hub:anomaly-lifecycle'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -56,4 +59,50 @@ export function resetRows(key: string): EntryRow[] {
 
 export function storageKey(): string {
   return STORAGE_KEY
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return clone(fallback)
+  }
+  const raw = window.localStorage.getItem(key)
+  if (!raw) {
+    return clone(fallback)
+  }
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return clone(fallback)
+  }
+}
+
+export function lifecycleStorageKey(): string {
+  return LIFECYCLE_KEY
+}
+
+// 每次调用都从 localStorage 重新读取：多标签页并发时才能看到彼此写入的修订号。
+export function readLifecycleState(): AnomalyLifecycleState {
+  const parsed = readJson<Partial<AnomalyLifecycleState>>(LIFECYCLE_KEY, emptyLifecycle())
+  return {
+    schemaVersion: 1,
+    sequence: Number(parsed.sequence ?? 0),
+    detectors: parsed.detectors ?? {},
+    linkages: parsed.linkages ?? {},
+    conflictQueue: parsed.conflictQueue ?? [],
+  }
+}
+
+export function saveLifecycleState(state: AnomalyLifecycleState): void {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return
+  }
+  window.localStorage.setItem(LIFECYCLE_KEY, JSON.stringify(state))
+}
+
+export function resetLifecycleState(): AnomalyLifecycleState {
+  const state = emptyLifecycle()
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem(LIFECYCLE_KEY)
+  }
+  return state
 }
